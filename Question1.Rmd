@@ -1,17 +1,30 @@
 ---
 title: 'Appendix A: Question 1 Code'
 output:
-  pdf_document: default
+  pdf_document:
+    number_sections: yes
   html_notebook: default
   html_document:
     df_print: paged
+    number_sections: true
+  urlcolor: black
+  linkcolor: black
+  fontsize: 12pt
+  geometry: margin = 1.2in
+  header-includes:
+  - \usepackage{placeins}
+  - \usepackage{setspace}
+  - \usepackage{chngcntr}
+  - \onehalfspacing
+  - \counterwithin{figure}{section}
+  - \counterwithin{table}{section}
 editor_options: 
   chunk_output_type: inline
 ---
 This appendix contains all the code required for question one. At each point the code has been commented where required and
 additional explanations are included. 
 
-\section{Enviroment Setup and Import data files}
+#Enviroment Setup and Import data files
 This notebook is set up to make the results atained as reproducable as posible. To this end, the script from `boston_data_splitter.R` has been included within the notebook such that results can be easily reproduced. This enables all the required information to be pulled directly without having to run a seperate script first. My unique student seed of 26 has been used and is the source of randomess throught the code.
 ```{r}
 #setup work space, install packages and import libs
@@ -114,7 +127,7 @@ sprintf("Test MSE for basic linear model: %s", mse.generic(lm.fit, Boston.test))
 \section{Model interms of fit and significance}
 From the summary we can identify what coefficents have an impact on the model based on each predictors $p$ value. The main variables of significance are: `nox`,`rm`,`dis`,`ptratio` and `lstat`. By looking at the R-squared and adjusted R-squared values we can find how effective the model is. From these we can see that the model expresses 69.39% of the variation in the training set.
 
-\subsection{Further model investigation for heteroskedasticity & multicollinearity}
+\subsection{Further model investigation for heteroskedasticity \& multicollinearity}
 ```{r}
 bptest(lm.fit)
 vif(lm.fit)
@@ -252,12 +265,12 @@ Next introduce the interaction terms to try and improve the model. Lasso is used
 The following posible interaction terms will be examined:
 \begin{enumerate}
 \itemsep0em 
-\item rm  <-> dis: average number of rooms per dwelling & weighted mean of distances to five Boston employment centres
-\item dis <-> rad: weighted mean of distances to five Boston employment centres & index of accessibility to radial highways
-\item tax <-> lstat: full-value property-tax rate & lower status of the population (percent).
-\item nox <-> rad: nitrogen oxides concentration & index of accessibility to radial highways
-\item crim <-> lstat: per capita crime rate by town & lower status of the population (percent).
-\item lstat <-> rm: lower status of the population (percent) & average number of rooms per dwelling
+\item rm  <-> dis: average number of rooms per dwelling \& weighted mean of distances to five Boston employment centres
+\item dis <-> rad: weighted mean of distances to five Boston employment centres \& index of accessibility to radial highways
+\item tax <-> lstat: full-value property-tax rate \& lower status of the population (percent).
+\item nox <-> rad: nitrogen oxides concentration \& index of accessibility to radial highways
+\item crim <-> lstat: per capita crime rate by town \& lower status of the population (percent).
+\item lstat <-> rm: lower status of the population (percent) \& average number of rooms per dwelling
 \end{enumerate}
 ```{r echo=TRUE}
 x <- model.matrix(medv ~ . + rm:lstat +rm:dis + dis:rad + nox:rad + crim:lstat +tax:lstat,
@@ -656,8 +669,8 @@ modelPreformance <- rbind(modelPreformance,
                                      mse.test=mse.value,
                                      interactionTerms=as.numeric(length(coef(stepped3)))
                                     ))
+sprintf("Test MSE for Stepped model with third order interaction terms %s", mse.value)
 ```
-Test MSE for Stepped model with third order interaction terms: `r mse.value`.
 \subsection{Model comparison}
 The last thing to do is to compare the diffrent models and look for the one that produced the best fit overall.
 ```{r}

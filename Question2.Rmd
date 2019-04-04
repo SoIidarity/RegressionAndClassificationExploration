@@ -6,7 +6,7 @@ output:
     fig_width: 5
   html_notebook: default
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 This appendix contains all the code to answer question 2 of the assignment. It should be considered along with the report wherein the analisis can be found.
 
@@ -25,6 +25,7 @@ suppressMessages(library(h2o))
 suppressMessages(library(tictoc))
 suppressMessages(library(heplots))
 suppressMessages(library(knitr))
+suppressMessages(library(klaR))
 options(warn = -1)
 
 # Extract the testing and training data from the provided csv files. These
@@ -101,13 +102,12 @@ storeModelTestPreformance <- function(modelName, confusionMatrix){
 \section{Question 1.a: Logistic Regression Model}
 First we use standard logistic regression to fit a model onto the data set. To make the visulization of outputs easier the `confusionMatrix` function is used from the `caret` package. This is effectivly the same as calling `table` on both the predicted and actual results and then calculating the true positive and negative rates. The key terms from the confusion matrix of intrest are:
 \begin{enumerate}
-\itemsep0em 
 \item *Accuracy:* Quantifies the overall model quality of fit
 \item *Kappa:* similar to Accuracy score, but it takes into account the accuracy that would have happened anyway through random predictions.
 \item *Sensitivity:* true positive rate (correctly identified emails)
 \item *Specificity:* true negative rate (correctly identified spam)
 \item *F1:* = cosniders both the precision and recall to quantify quality such that$(2 \times Precision \times Recall) / (Precision + Recall)$
-
+\end{enumerate}
 \subsection{General Linear Model}
 First step is to fit a general linear model, with famialy binomial, to indicate the fit is creating a standard logistic regression model.
 ```{r, warning=FALSE}
@@ -129,11 +129,14 @@ glm.pred[probs > 0.5] <- "spam"
 storeModelValidationPreformance("GLM", cm)
 
 plot(probs, as.factor(glm.pred),
-     col=(Spam.validation$spam=="spam")+10, #colour 10 is red, colour 11 is green
+     col=(Spam.validation$spam=="spam")+9, #colour 10 is red, colour 11 is green
      type="p",
      xlab="probability",
-     ylab="Responce")
+     ylab="Responce",
+     yaxt="n")
 grid()
+abline(v=c(0.5), lty=2, lwd=3)
+axis(2, at=1:2, labels=c('Not Spam','Spam'))
 
 # Roc
 glm.fit %>%
@@ -307,6 +310,41 @@ plot(lda.pred$x[,1], lda.pred$class, col=(Spam.validation$spam=="spam")+10, type
 lda.pred <- predict(lda.fit, newdata = Spam.test, type = "response")
 cm <- confusionMatrix(factor(lda.pred$class), Spam.test$spam, mode = "everything")
 storeModelTestPreformance("LDA",cm)
+```
+
+LDA stepwise selection. for this the greedy.wilks function is used to preform variable selection.
+```{r}
+#select the relevent variables
+lda.wilks <- greedy.wilks(spam ~ .,data=Spam.train, niveau = 0.05)  
+
+#build the model on the new variables
+lda.fit <- lda(lda.wilks$formula, data=Spam.train, method="moment")
+
+# Step2) Discriminant Score Estimates for Each Observation ####
+pred <- predict(lda.fit)
+
+# Plot the discriminant scores
+plot(lda.fit, dimen = 1, type="both") 
+
+plot(pred$x[,1],
+     xlab="Observation Index",
+     ylab="Discriminant Magnitude",
+     col=factor(Spam.train$spam))
+legend("topleft",
+       legend=levels(factor(Spam.train$spam)), 
+       text.col=seq_along(levels(factor(Spam.train$spam))))
+grid()
+
+#prediction results
+lda.pred <- predict(lda.fit, newdata = Spam.validation, type = "response")
+cm <- confusionMatrix(factor(lda.pred$class), Spam.validation$spam, mode = "everything")
+storeModelValidationPreformance("LDA, wilks",cm)
+cm
+
+#test results
+lda.pred <- predict(lda.fit, newdata = Spam.test, type = "response")
+cm <- confusionMatrix(factor(lda.pred$class), Spam.test$spam, mode = "everything")
+storeModelTestPreformance("LDA, wilks",cm)
 ```
 
 \subsection{Quadratic discriminant analysis}
@@ -695,6 +733,7 @@ for (i in 1:n) {
 plot(res_devTest[1:n],
      xaxt = "n",
      xlab='Grid Parameters (ntrees, mtries, max_depth)',
+     ylab='Residual Deviance',
      ylim=c(min(res_devOOB,res_devTest)*0.95,
             max(res_devOOB,res_devTest)*1.05),
      type = "b",
@@ -705,8 +744,8 @@ axis(1,
 lines(res_devOOB[1:n],
       type = "o",
       col ="blue")
-legend("bottomright",
-       c("OOB","Test"),
+legend("right",
+       c("GBM Training","Training"),
        pch = 21,
        pt.bg = "white",
        lty = 1,
