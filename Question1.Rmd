@@ -1,30 +1,17 @@
 ---
 title: 'Appendix A: Question 1 Code'
 output:
-  pdf_document:
-    number_sections: yes
+  pdf_document: default
   html_notebook: default
   html_document:
     df_print: paged
-    number_sections: true
-  urlcolor: black
-  linkcolor: black
-  fontsize: 12pt
-  geometry: margin = 1.2in
-  header-includes:
-  - \usepackage{placeins}
-  - \usepackage{setspace}
-  - \usepackage{chngcntr}
-  - \onehalfspacing
-  - \counterwithin{figure}{section}
-  - \counterwithin{table}{section}
 editor_options: 
   chunk_output_type: inline
 ---
 This appendix contains all the code required for question one. At each point the code has been commented where required and
 additional explanations are included. 
 
-#Enviroment Setup and Import data files
+### Enviroment Setup and Import data files
 This notebook is set up to make the results atained as reproducable as posible. To this end, the script from `boston_data_splitter.R` has been included within the notebook such that results can be easily reproduced. This enables all the required information to be pulled directly without having to run a seperate script first. My unique student seed of 26 has been used and is the source of randomess throught the code.
 ```{r}
 #setup work space, install packages and import libs
@@ -48,13 +35,12 @@ set.seed(26)
 Boston <- fulldata[sample(1:nrow(fulldata), 400, replace=FALSE), ]
 write.csv(Boston, 'my_boston.csv')
 
-#create a dataframe to store all the mean squred error results as this is the
-#primarty way of comparing results for this project.
+#create a dataframe to store all the mean squred error results as this is the primarty way of comparing results for this project.
 modelPreformance <-data.frame()
 ```
 
 Basic plotting to visualise information with the data and extraction of key metrics like column names and types
-```{r Fig1, echo=TRUE}
+```{r Fig1, echo=TRUE, fig.height=8, fig.width=8}
 pairs.panels(Boston[c(-4)],cex=1,lm=TRUE)
 corrplot(cor(Boston), method = "circle")
 sapply(Boston,class)
@@ -62,8 +48,8 @@ str(Boston)
 ```
 
 
-\section{Data exploration}
-```{r Fig2, echo=TRUE}
+### Data exploration
+```{r Fig2, echo=TRUE, fig.cap="\\label{fig:fig1}This is a caption"}
 medvHist <- ggplot(Boston, aes(medv))
 medvHist + geom_histogram(aes(y = ..density.., fill = ..count..),
                           colour = 'white', bins = 30) + 
@@ -74,12 +60,29 @@ medvHist + geom_histogram(aes(y = ..density.., fill = ..count..),
         axis.line   = element_line(colour="black"),
         axis.line.x = element_line(colour="gray"),
         axis.line.y = element_line(colour="gray"),
-        legend.position=c(0.1,0.5)) + 
+        legend.position=c(0.1,0.9)) + 
+  theme_bw()
+```
+
+From this we can see that we can see that the data has some degree of a right skewed distribution and a log transformation might help in this regard.
+
+```{r}
+medvHist <- ggplot(log(Boston), aes(medv))
+medvHist + geom_histogram(aes(y = ..density.., fill = ..count..),
+                          colour = 'white', bins = 25) + 
+  geom_density() +
+  scale_fill_gradient("Count", low = "black", 
+    high = "lightblue") +
+  theme(panel.background = element_rect(fill = "gray98"),
+        axis.line   = element_line(colour="black"),
+        axis.line.x = element_line(colour="gray"),
+        axis.line.y = element_line(colour="gray")) + 
+  ggtitle("Histogram of log(MEDV)")+
   theme_bw()
 ```
 
 
-\section{Useful functions}
+### Useful functions
 Before answering the questions there are a number of useful functions to define, such as calculating the MSE for a given model and test set.
 ```{r}
 #calculating MSE for test set
@@ -97,7 +100,7 @@ mse.generic <- function(model, actual) {
 }
 ```
 
-##Question 1.a
+## Question 1.a
 Partition the data for training and test sets. Use a seed to make the results reproducable. Set 320 samples for training and 80 for testing. this is 80% for training, 20% for testing
 ```{r}
 set.seed(26) # need to set the seed again to ensure reproducability
@@ -113,7 +116,7 @@ Then create a multiple linear regression model for the training set to regress `
 lm.fit <- lm(medv ~ ., data = Boston, subset = train)
 par(mfrow = c(2, 2))
 plot(lm.fit)
-#summary(lm.fit)
+summary(lm.fit)
 
 model.pred <- predict(lm.fit, Boston.test)
 mean((model.pred - Boston.test$medv)^2)
@@ -124,10 +127,10 @@ sprintf("Train MSE for basic linear model: %s", mse.generic(lm.fit, Boston.train
 sprintf("Test MSE for basic linear model: %s", mse.generic(lm.fit, Boston.test))
 ```
 
-\section{Model interms of fit and significance}
+#### Model interms of fit and significance
 From the summary we can identify what coefficents have an impact on the model based on each predictors $p$ value. The main variables of significance are: `nox`,`rm`,`dis`,`ptratio` and `lstat`. By looking at the R-squared and adjusted R-squared values we can find how effective the model is. From these we can see that the model expresses 69.39% of the variation in the training set.
 
-\subsection{Further model investigation for heteroskedasticity \& multicollinearity}
+### Further model investigation for heteroskedasticity & multicollinearity
 ```{r}
 bptest(lm.fit)
 vif(lm.fit)
@@ -136,7 +139,7 @@ vif(lm.fit)
 From the studentized Breusch-Pagan test the heteroskedasticity of the model can be investigated. The low p-value of 2.205e-05 suggests that our data is homoskedastic (not heteroskedastic). This is important as it is a requirement for creating linear models. The vif function tells us about the multicollinearity of model model. Values above 5 are considered problimatic and so removing the tax term is advisable.
 
 To quantify the variable significance we can plot the varimportance of the model. we will generate a new Linear model to using repeated cross validation and then plot the variable importance.
-```{r  echo=TRUE}
+```{r  echo=TRUE, fig.height=4, fig.width=4}
 #Controller to preform repeated cross validation
 controller <- trainControl(
   method = "repeatedcv", # repeated cross validation
@@ -183,11 +186,11 @@ sprintf("Test MSE for Cross validated linear model: %s", mse.generic(lm.fit, Bos
 ```
 
 
-\section{Question 1.b}
+## Question 1.b
 The basic linear model derived in question 1.a will now be improved. The quality of this improvement will be quantified by the MSE on the test data. Two main process will be implemented to improve the model. The first involves analizing the previous linear model to identify the important variables and potentual interaction terms based off this exploration will then be included in the model. Variable selection methods such as Lasso will be preformed on the model. This model will be tested and a breif investigation into residual diagnosis will then be preformed. 
 
 Can define a generic function to plot the variable significance. This is used later on when plotting
-```{r echo=TRUE}
+```{r echo=TRUE, fig.height=4, fig.width=4}
 significancePlot <- function(lassocoef) {
 #next we need to conver this to a dataframe so we can do proccessing on it
 lassocoef.df <- as.data.frame(as.matrix(lassocoef))
@@ -196,32 +199,23 @@ df.processed <- data.frame(Name = rownames(lassocoef.df), Significance = lassoco
 #remove the intercept term
 df.processed <- df.processed[-c(df.processed$Name == '(Intercept)'),]
 #Print the terms
-#print(df.processed)
+print(df.processed)
 
 print(colSums(df.processed!=0))
 #order by value of significance
-df.processed$Name <- factor(df.processed$Name,
-                            levels = df.processed$Name[order(df.processed$Significance)])
+df.processed$Name <- factor(df.processed$Name, levels = df.processed$Name[order(df.processed$Significance)])
 #plot the variable significance. Note that the colour is defined by the sign on significance. Only non-zero terms are plotted
-ggplot(df.processed[which(df.processed$Significance != 0),],
-       aes(x=Significance,
-           y=Name,
-           color = Significance > 0)) +
-  labs(x = "Significance",
-       y = "Component Name",
-       color = "Contribution\n") +
-  scale_color_manual(labels = c("Negative", "Positive"),
-                     values = c("red", "green")) +
-        geom_segment(aes(x = 0,
-                         y = Name,
-                         xend = Significance,
-                         yend = Name),
-                     color = "grey50") +
+ggplot(df.processed[which(df.processed$Significance != 0),], aes(x=Significance, y=Name, color = Significance > 0)) +
+  labs(x = "Significance", y = "Component Name", color = "Contribution\n") +
+  scale_color_manual(labels = c("Negative", "Positive"), values = c("red", "green")) +
+        geom_segment(aes(x = 0, y = Name, xend = Significance, yend = Name), color = "grey50") +
         geom_point() +
   theme_bw() +
   theme(legend.position=c(0.9,0.12))
 }
 ```
+
+
 
 First a simple lasso is preformed as a point of comparison for when interaction terms are included.
 ```{r echo=TRUE, fig.height=3, fig.width=4}
@@ -263,18 +257,14 @@ significancePlot(coef(cv.out, s = "lambda.min"))
 Next introduce the interaction terms to try and improve the model. Lasso is used to remove the irrelevent terms
 
 The following posible interaction terms will be examined:
-\begin{enumerate}
-\itemsep0em 
-\item rm  <-> dis: average number of rooms per dwelling \& weighted mean of distances to five Boston employment centres
-\item dis <-> rad: weighted mean of distances to five Boston employment centres \& index of accessibility to radial highways
-\item tax <-> lstat: full-value property-tax rate \& lower status of the population (percent).
-\item nox <-> rad: nitrogen oxides concentration \& index of accessibility to radial highways
-\item crim <-> lstat: per capita crime rate by town \& lower status of the population (percent).
-\item lstat <-> rm: lower status of the population (percent) \& average number of rooms per dwelling
-\end{enumerate}
-```{r echo=TRUE}
-x <- model.matrix(medv ~ . + rm:lstat +rm:dis + dis:rad + nox:rad + crim:lstat +tax:lstat,
-                  Boston)[, -1]
+1) rm  <-> dis: average number of rooms per dwelling & weighted mean of distances to five Boston employment centres
+2) dis <-> rad: weighted mean of distances to five Boston employment centres & index of accessibility to radial highways
+3) tax <-> lstat: full-value property-tax rate & lower status of the population (percent).
+4) nox <-> rad: nitrogen oxides concentration & index of accessibility to radial highways
+5) crim <-> lstat: per capita crime rate by town & lower status of the population (percent).
+6) lstat <-> rm: lower status of the population (percent) & average number of rooms per dwelling
+```{r echo=TRUE, fig.height=4, fig.width=4}
+x <- model.matrix(medv ~ . + rm:lstat +rm:dis + dis:rad + nox:rad + crim:lstat +tax:lstat, Boston)[, -1]
 x <- scale(x)
 y <- Boston$medv
 
@@ -311,8 +301,7 @@ significancePlot(coef(cv.out, s = "lambda.min"))
 
 We can take the previous method of preforming the lasso and rebuild with fewer variables 
 ```{r echo=TRUE, fig.height=3, fig.width=4}
-x <- model.matrix(medv ~ . + rm*dis + tax*lstat + rm*lstat -age -chas -zn -nox -indus,
-                  Boston)[, -1]
+x <- model.matrix(medv ~ . + rm*dis + tax*lstat + rm*lstat -age -chas -zn -nox -indus, Boston)[, -1]
 x <- scale(x)
 y <- Boston$medv
 
@@ -331,8 +320,8 @@ plot(cv.out)
 #we can now select the lowest lambda and use this to predict the output
 bestlambda <- cv.out$lambda.min
 
-#cross validation testing error
-sprintf("Cross validation testing error for refined model %s", min(cv.out$cvm))
+#cross validation training error
+sprintf("Cross validation training error for refined model %s", min(cv.out$cvm))
 
 #training error
 lasso.pred <- predict(lasso.mod, s = bestlambda, newx = x[train, ])
@@ -348,9 +337,11 @@ significancePlot(coef(cv.out, s = "lambda.min"))
 ```
 A breif residual diagnosis is now done on this refined model.
 ```{r}
+
 plotres(lasso.mod, which = 3)
 plotres(lasso.mod, which = 4)
 ```
+
 
 After this, a more itterative process will be preformed to try and derive the best posible model interms of lowest MSE resulting in highest prediction accuracy. A number of new methods will be introduced in this process, including Ridge regression, Lasso regression and Elastic net regression. Tree based methods are used in the question 1.c
 
@@ -398,7 +389,7 @@ plotres(lasso.mod, which = 4)
 ```
 
 
-\subsection{Cross validation controller}
+### Cross validation controller
 Each model constructed will use repeated Cross validation to select the hyper marameters. To this end, a controller is used to preform repeated cross validation on each of the models that follow. The data sample is shuffled prior to each repetition, which results in a different split of the sample being used for each round of cross validation. This is done to reduce the effect of one variable being dependent on another and to reduce the estimator bias.
 ```{r}
 # this set of functions come from the caret package and make the process
@@ -411,7 +402,7 @@ controller <- trainControl(
 )
 ```
 
-\subsection{Ridge Regression}
+### Ridge Regression
 First, a Ridge regression model is fitted. Second order interaction terms are included in the model to allow for higher quality model fits. The theory and justification for using the ridge regression process can be found in the report. The ridge regression model aims to minimize the following expression.
 
 $$
@@ -424,20 +415,15 @@ ridge <- train(medv ~ .,
                method = 'glmnet',
                tuneGrid = expand.grid(
                  alpha = 0, # alpha = 0 for ridge regression
-                 #generate a series of 20 lambdas from 0.0001 up to 1
-                 lambda = seq(0.4, 0.8,length = 150)), 
-               #use the controller to do cross validation for each lambda selection step
-               trControl = controller) 
+                 lambda = seq(0.4, 0.8,length = 150)), #generate a series of 20 lambdas from 0.0001 up to 1
+               trControl = controller) #use the controller to do cross validation for each lambda selection step
 
 mse.value <- mse(ridge)
 modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated ridge",
                                      orderOfInteractionTerms=1,
                                      mse.train=mse.generic(ridge,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(ridge$finalModel,
-                                                    s = ridge$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Ridge regression with first order interaction terms: %s", mse.value)
 ridge2 <- train(medv ~ .^2,
                data = Boston,
@@ -445,8 +431,7 @@ ridge2 <- train(medv ~ .^2,
                method = 'glmnet',
                tuneGrid= expand.grid(
                  alpha = 0, # alpha = 0 for ridge regression
-                 #generate a series of 20 lambdas from 0.0001 up to 1
-                 lambda = seq(0.4, 0.8,length = 150)), 
+                 lambda = seq(0.4, 0.8,length = 150)), #generate a series of 20 lambdas from 0.0001 up to 1
                trControl = controller) 
 
 # Print the MSE
@@ -455,14 +440,10 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated ridge",
                                      orderOfInteractionTerms=2,
                                      mse.train=mse.generic(ridge2,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(ridge2$finalModel,
-                                                    s = ridge2$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Ridge regression with second order interaction terms: %s", mse.value)
 ```
-
-\subsection{Lasso Regression}
+### Lasso Regression
 Next, a Lasso is used to try and furter reduce the model error. Lasso is similar to Ridge except it is able to compleatly remove interaction terms that are not required by the model. Lasso aims to minamize the following expression:
 
 $$
@@ -485,10 +466,7 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated lasso",
                                      orderOfInteractionTerms=1,
                                      mse.train=mse.generic(lasso,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(lasso$finalModel,
-                                                    s = lasso$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 #Second order
 lasso2 <- train(medv ~ .^2,
                data=Boston,
@@ -504,10 +482,7 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated lasso",
                                      orderOfInteractionTerms=2,
                                      mse.train=mse.generic(lasso2,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric
-                                     (colSums(coef(lasso2$finalModel,
-                                                   s = lasso2$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Lasso regression with second order interaction terms: %s", mse.value)
 
 
@@ -526,13 +501,10 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated lasso",
                                      orderOfInteractionTerms=3,
                                      mse.train=mse.generic(lasso3,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(lasso3$finalModel,
-                                                    s = lasso3$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Lasso regression with third order interaction terms: %s", mse.value)
 ```
-\subsection{Elastic Net regression}
+### Elastic Net regression
 Lastly, an Elastic net is fitted onto the data set. Elastic net uses a combination of Ridge and Lasso regression such that it has two tuning parameters $\lambda$ and $\alpha$. The closer to 1 $\alpha$ is the more the Elastic net acts like a Lasso and the closer to 0 it gets the more it acts like a ridge. In this way the elastic net is able to identify the optimum combination of ridge and lasso to fit a given model. The elastic net aims to minimize:
 $$
 \sum_{i=1}^{n} (y_i-\hat{y_i})+\lambda\left((1-\alpha)\sum_{j}^{m}\beta^2_j+\alpha\sum_{j}^{m}|\beta_j |\right)
@@ -553,10 +525,7 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated elastic net",
                                      orderOfInteractionTerms=1,
                                      mse.train=mse.generic(elasticNet,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(elasticNet$finalModel,
-                                                    s = elasticNet$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Elastic net regression with first order interaction terms: %s", mse.value)
 # second order elastic net
 elasticNet2 <- train(medv ~.^2,
@@ -573,10 +542,7 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated elastic net",
                                      orderOfInteractionTerms=2,
                                      mse.train=mse.generic(elasticNet2,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(elasticNet2$finalModel,
-                                                    s = elasticNet2$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Elastic net regression with second order interaction terms: %s", mse.value)
 
 #Third order elastic net
@@ -594,20 +560,22 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Cross validated elastic net",
                                      orderOfInteractionTerms=3,
                                      mse.train=mse.generic(elasticNet3,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       colSums(coef(elasticNet3$finalModel,
-                                                    s = elasticNet3$bestTune$lambda)!=0))))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Elastic net regression with third order interaction terms: %s", mse.value)
 ```
 
 ```{r}
+coefs <- coef(elasticNet2$finalModel, elasticNet2$bestTune$alpha, elasticNet2$bestTune$lambda)
+
+print(colSums(coefs!=0))
+coefs
+
 plotres(elasticNet2, which = 3)
 plotres(elasticNet2, which = 4)
 ```
 
 
-\subsection{Stepped AIC}
+### Stepped AIC
 we can look at including all posible interaction terms within the linear model and then identifying the one with the lowest error through a reccursive stepped AIC process
 
 ```{r}
@@ -627,10 +595,7 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Stepped",
                                      orderOfInteractionTerms=1,
                                      mse.train=mse.generic(stepped,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       length(coef(stepped$finalModel)))
-                                     ))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Stepped model with first order interaction terms: %s", mse.value)
 # second order stepped
 stepped2 <- train(medv ~.,
@@ -647,17 +612,14 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Stepped",
                                      orderOfInteractionTerms=2,
                                      mse.train=mse.generic(stepped2,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(
-                                       length(coef(stepped2$finalModel)))
-                                     ))
+                                     mse.test=mse.value))
 sprintf("Test MSE for Stepped model with second order interaction terms: %s", mse.value)
 
 stepped3 <- step(lm.fit,
                 scope = list(
                   upper=medv~.^3,
                   lower = medv ~ 1), 
-                direction= "both", 
+                direction= "00both", 
                 steps = 1000, 
                 trace=FALSE)
 
@@ -666,17 +628,16 @@ modelPreformance <- rbind(modelPreformance,
                           data.frame(modelName="Stepped",
                                      orderOfInteractionTerms=3,
                                      mse.train=mse.generic(stepped3,Boston.train),
-                                     mse.test=mse.value,
-                                     interactionTerms=as.numeric(length(coef(stepped3)))
-                                    ))
-sprintf("Test MSE for Stepped model with third order interaction terms %s", mse.value)
+                                     mse.test=mse.value))
+sprintf("Test MSE for Stepped model with third order interaction terms: %s", mse.value)
 ```
-\subsection{Model comparison}
+
+### Model comparison
 The last thing to do is to compare the diffrent models and look for the one that produced the best fit overall.
 ```{r}
 model_list <- list(LinearModel = linear, Ridge = ridge, Ridge2 = ridge2, Lasso = lasso,  Lasso2 = lasso2, Lasso3= lasso3, ElasticNet = elasticNet, ElasticNet2 = elasticNet2, ElasticNet3 = elasticNet3)
 res <- resamples(model_list)
-#summary(res)
+summary(res)
 bwplot(res)
 splom(res)
 
@@ -684,8 +645,8 @@ modelPreformance[order(modelPreformance$mse.train),]
 ```
 Now that we have identified the best posible model we can plot the test results and compare the diffrence between that the inclusion of interaction terms creates.
 ```{r}
-  pred <- predict(elasticNet2,Boston.test)
-  ggplot(data= Boston.test, aes(medv,pred)) +
+  predicted3 <- predict(stepped3,Boston.test)
+  ggplot(data= Boston.test, aes(medv,predicted3)) +
   geom_point(alpha=0.5) + 
   stat_smooth() +
   xlab('Actual value of medv') +
@@ -697,7 +658,7 @@ Now that we have the ideal model we can look into preforming residual diagnostic
 ```{r}
 par(mfrow = c(2, 2))
 plot(stepped3)
-#summary(stepped3)
+summary(stepped3)
 
 #residual diagnosis
 ols_plot_resid_qq(stepped3)
@@ -709,7 +670,7 @@ ols_test_breusch_pagan(stepped3)
 
 ```
 
-\section{Question 1.c}
+## Question 1.c
 Next, the use of a regression tree to model is explored. First, a large regression tree is fitted to the data such that it perfectly predicts the test cases. After this, the tree is pruned down through a process of cross validation. Note that I did not use the train method from the caret packet here becuse it obverscates some of the steps in generating the tree using `rpart` that were undesirable.
 
 ```{r}
@@ -723,7 +684,7 @@ tree.boston <- tree(medv ~ .,
                     subset = train)
 plot(tree.boston)
 text(tree.boston, pretty = 0)
-#summary(tree.boston)
+summary(tree.boston)
 
 #we can look at the training and test error for the full tree
 yhat_train <- predict(tree.boston, newdata = Boston.train)
@@ -742,7 +703,6 @@ plot(cv.boston$size[160:180],
      type = "b",
      xlab="Tree size",
      ylab= "Cross validation deviance")
-grid()
 
 
 #the ideal tree size is the one that minimises the cross-validated error
@@ -754,7 +714,7 @@ prune.boston <- prune.tree(tree.boston, best = tree.min)
 
 plot(prune.boston)
 text(prune.boston, pretty = 0)
-#summary(prune.boston)
+summary(prune.boston)
 
 #calculate the pruned training error. This will have been introduced as the tree
 #no longer fits the training data with 100% accuracy
@@ -768,19 +728,14 @@ yhat.prune <- predict(prune.boston, newdata = Boston.test)
 MSE <- mean((yhat.prune - Boston.test$medv)^2)
 sprintf("Test MSE for pruned tree: %s", MSE)
 ```
-\subsection{Implement using the rpart package}
-
-
+### Implement using the rpart package
 ```{r}
 # Classification Tree with rpart
 library(rpart)
-library(rpart.plot)
 
 # grow tree 
 set.seed(26)
-fit <- rpart(medv ~.,
-             method="poisson",
-             data=Boston, 
+fit <- rpart(medv ~., method="poisson", data=Boston, 
              control = rpart.control(
               minsplit = 2,
               cp = 0,
@@ -792,7 +747,6 @@ fit <- rpart(medv ~.,
               ),
               subset = train)
 plotcp(fit) 
-grid()
 
 #training mse
 yhat <- predict(fit, newdata = Boston.train)

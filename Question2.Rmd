@@ -6,7 +6,7 @@ output:
     fig_width: 5
   html_notebook: default
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 This appendix contains all the code to answer question 2 of the assignment. It should be considered along with the report wherein the analisis can be found.
 
@@ -24,8 +24,6 @@ suppressMessages(library(caret))
 suppressMessages(library(h2o))
 suppressMessages(library(tictoc))
 suppressMessages(library(heplots))
-suppressMessages(library(knitr))
-suppressMessages(library(klaR))
 options(warn = -1)
 
 # Extract the testing and training data from the provided csv files. These
@@ -41,8 +39,7 @@ full.data <- read.csv("spam_data.csv")
 # and 20% of the rows are left as the validation set.
 
 set.seed(42)
-#~80% of the set
-train <- sample(seq_len(nrow(full.data)), size = ceiling(dim(full.data)[1]*0.8))
+train <- sample(seq_len(nrow(full.data)), size = ceiling(dim(full.data)[1]*0.8)) #~80% of the set
 Spam.train <- full.data[train, ] #2881 observations used for training
 Spam.validation <- full.data[-train, ] #720 observations left for validation
 
@@ -99,16 +96,15 @@ storeModelTestPreformance <- function(modelName, confusionMatrix){
 ```
 
 
-\section{Question 1.a: Logistic Regression Model}
+## Question 1.a: Logistic Regression Model
 First we use standard logistic regression to fit a model onto the data set. To make the visulization of outputs easier the `confusionMatrix` function is used from the `caret` package. This is effectivly the same as calling `table` on both the predicted and actual results and then calculating the true positive and negative rates. The key terms from the confusion matrix of intrest are:
-\begin{enumerate}
-\item *Accuracy:* Quantifies the overall model quality of fit
-\item *Kappa:* similar to Accuracy score, but it takes into account the accuracy that would have happened anyway through random predictions.
-\item *Sensitivity:* true positive rate (correctly identified emails)
-\item *Specificity:* true negative rate (correctly identified spam)
-\item *F1:* = cosniders both the precision and recall to quantify quality such that$(2 \times Precision \times Recall) / (Precision + Recall)$
-\end{enumerate}
-\subsection{General Linear Model}
+1. *Accuracy:* Quantifies the overall model quality of fit
+2. *Kappa:* similar to Accuracy score, but it takes into account the accuracy that would have happened anyway through random predictions.
+3. *Sensitivity:* true positive rate (correctly identified emails)
+4. *Specificity:* true negative rate (correctly identified spam)
+5. *F1:* = cosniders both the precision and recall to quantify quality such that$(2 \times Precision \times Recall) / (Precision + Recall)$
+
+### General Linear Model
 First step is to fit a general linear model, with famialy binomial, to indicate the fit is creating a standard logistic regression model.
 ```{r, warning=FALSE}
 glm.fit <- glm(spam ~ .,
@@ -127,23 +123,14 @@ glm.pred <- rep("email", length(probs))
 glm.pred[probs > 0.5] <- "spam"
 (cm <- confusionMatrix(factor(glm.pred), Spam.validation$spam, mode = "everything"))
 storeModelValidationPreformance("GLM", cm)
+    
+#prediction vs accuraccy plot
+plot(probs, as.factor(glm.pred), col=(Spam.validation$spam=="spam") + 10, type="p")
 
-plot(probs, as.factor(glm.pred),
-     col=(Spam.validation$spam=="spam")+9, #colour 10 is red, colour 11 is green
-     type="p",
-     xlab="probability",
-     ylab="Responce",
-     yaxt="n")
-grid()
-abline(v=c(0.5), lty=2, lwd=3)
-axis(2, at=1:2, labels=c('Not Spam','Spam'))
-
-# Roc
+# Roc for glm
 glm.fit %>%
   blr_gains_table() %>%
-  blr_roc_curve(xaxis_title = "False Positive Rate",
-                yaxis = "True Positive Rate") +
-  theme_bw()
+  blr_roc_curve(xaxis_title = "False Positive Rate", yaxis = "True Positive Rate")
 
 # test predictions
 probs <- predict(glm.fit, newdata = Spam.test[-58], type = "response")
@@ -151,14 +138,19 @@ glm.pred <- rep("email", length(probs))
 glm.pred[probs > 0.5] <- "spam"
 (cm <- confusionMatrix(factor(glm.pred), Spam.test$spam, mode = "everything"))
 storeModelTestPreformance("GLM", cm)
+
+
 ```
 
-\subsection{Forward, backward and bothways stepwise selection}
+
+### Forward, backward and bothways stepwise selection
 ```{r, results="hide"}
 #***backwards***#
+tic()
 suppressMessages(backwards <- stepAIC(glm.fit,
                   direction = "backward",
                   trace=FALSE))
+toc()
 
 #predict validation results
 probs <- predict(backwards, newdata = Spam.validation[-58], type = "response")
@@ -178,9 +170,11 @@ storeModelTestPreformance("GLM Backward", cm)
     
 
 #***forwards***#
+tic()
 forwards <- step(glm.fit,
                   direction = "forward",
                   trace=FALSE)
+toc()
 
 #predict validation results
 probs <- predict(forwards, newdata = Spam.validation[-58], type = "response")
@@ -199,9 +193,11 @@ cm <- confusionMatrix(factor(glm.pred), Spam.test$spam, mode = "everything")
 storeModelTestPreformance("GLM Forwards", cm)
 
 #***bothways***#
+tic()
 bothways <- step(glm.fit,
                   direction = "both",
                   trace=FALSE)
+toc()
 #predict validation results
 probs <- predict(bothways, newdata = Spam.validation[-58], type = "response")
 glm.pred <- rep("email", length(probs))
@@ -219,7 +215,7 @@ cm <- confusionMatrix(factor(glm.pred), Spam.test$spam, mode = "everything")
 storeModelTestPreformance("GLM Bothways", cm)
 ```
 
-\subsection{Cross Validation with Lasso on General Linear Model}
+### Cross Validation with Lasso on General Linear Model
 Next, we can try using diffrent variable selection methods, such as using cross validation with lasso to select the best posible model. This is has the effect of removing irrelevent variables from the model and in the process refines the output. The output of the Lasso is also plotted to show the effect of increasing lambda with the output.
 ```{r}
 #generate lasso model
@@ -245,7 +241,19 @@ storeModelTestPreformance("CV Lasso GLM", cm)
 plot(cv.lasso)
 cm
 ```
-\subsection{Repeated cross validation with linear model}
+
+Next, consider looking at the prediction quality by a generating a ROC curve for the model. This can later be used to tune the model based on what outcome is most desired; true positive rate or false postive rate. In this context of this problem this will mean what is more important to the user? getting a spam in their main inbox or getting a non-spam in the spam directory? This important distinction is discussed in the report and explored later in question 2.e.
+```{r}
+pred <- prediction(cv.probs, Spam.test$spam)
+
+# calculate probabilities for TPR/FPR for predictions
+perf <- performance(pred, "tpr", "fpr")
+# performance(pred,"auc") # shows calculated AUC for model
+plot(perf, colorize = FALSE, col = "black") # plot ROC curve
+lines(c(0, 1), c(0, 1), col = "gray", lty = 4)
+```
+
+### Repeated cross validation with linear model
 
 Last thing to try in variable selection is to employ the `caret` package and try doing some kind of cross validated lasso using on the glm method. We can also look at variable importance using this method.
 ```{r, warning=FALSE}
@@ -290,13 +298,15 @@ coefs <- coef(cv.lasso, cv.lasso$lambda.min)
 print(colSums(coefs!=0))
 
 ```
-\section{Question 2.b: Discriminant Analysis}
+
+
+## Question 2.b: Discriminant Analysis
 Next discriminant analysis is applied to try and get a more refined model. Both linear discriminant analysis and quadratic discriminant analysis are applied and the same confusion matrix is generated.
 
-\subsection{Linear discriminat analysis}
+### Linear discriminat analysis
 ```{r}
 lda.fit <- lda(spam ~ ., data = Spam.train)
-plot(lda.fit)
+plot(lda.fit, col=4)
 
 #prediction results
 lda.pred <- predict(lda.fit, newdata = Spam.validation, type = "response")
@@ -304,7 +314,7 @@ cm <- confusionMatrix(factor(lda.pred$class), Spam.validation$spam, mode = "ever
 storeModelValidationPreformance("LDA",cm)
 cm
 
-plot(lda.pred$x[,1], lda.pred$class, col=(Spam.validation$spam=="spam")+10, type="p")
+plot(lda.pred$x[,1], lda.pred$class, col=(Spam.validation$spam=="spam") + 10, type="p")
 
 #test results
 lda.pred <- predict(lda.fit, newdata = Spam.test, type = "response")
@@ -312,42 +322,11 @@ cm <- confusionMatrix(factor(lda.pred$class), Spam.test$spam, mode = "everything
 storeModelTestPreformance("LDA",cm)
 ```
 
-LDA stepwise selection. for this the greedy.wilks function is used to preform variable selection.
-```{r}
-#select the relevent variables
-lda.wilks <- greedy.wilks(spam ~ .,data=Spam.train, niveau = 0.05)  
 
-#build the model on the new variables
-lda.fit <- lda(lda.wilks$formula, data=Spam.train, method="moment")
 
-# Step2) Discriminant Score Estimates for Each Observation ####
-pred <- predict(lda.fit)
 
-# Plot the discriminant scores
-plot(lda.fit, dimen = 1, type="both") 
-
-plot(pred$x[,1],
-     xlab="Observation Index",
-     ylab="Discriminant Magnitude",
-     col=factor(Spam.train$spam))
-legend("topleft",
-       legend=levels(factor(Spam.train$spam)), 
-       text.col=seq_along(levels(factor(Spam.train$spam))))
-grid()
-
-#prediction results
-lda.pred <- predict(lda.fit, newdata = Spam.validation, type = "response")
-cm <- confusionMatrix(factor(lda.pred$class), Spam.validation$spam, mode = "everything")
-storeModelValidationPreformance("LDA, wilks",cm)
-cm
-
-#test results
-lda.pred <- predict(lda.fit, newdata = Spam.test, type = "response")
-cm <- confusionMatrix(factor(lda.pred$class), Spam.test$spam, mode = "everything")
-storeModelTestPreformance("LDA, wilks",cm)
-```
-
-\subsection{Quadratic discriminant analysis}
+### Quadratic discriminant analysis
+Trying out 
 ```{r}
 qda.fit <- qda(spam ~ ., data = Spam.train)
 
@@ -362,17 +341,27 @@ probs <- predict(qda.fit, newdata = Spam.test, type = "response")
 cm <- confusionMatrix(probs$class, Spam.test$spam, mode = "everything")
 storeModelTestPreformance("QDA",cm)
 ```
-\subsection{Assumption Testing}
+Stepwise selection for LDA and QDA
+```{r}
+model <- greedy.wilks(spam ~ ., data = Spam.train, niveau = 0.05)
+
+```
+
+### Assumption Testing
 LDA assumes normal distributed data, features that are statistically independent, and identical covariance matrices for every class. These assumptions are now tested. When these assumptions hold, then LDA approximates the Bayes classifier very closely and the discriminant function produces a linear decision boundary.
 QDA assumes that observation of each class are drawn from a normal distribution (same as LDA). It also assumes that each class has its own covariance matrix (different from LDA).
 Assumptions:
 
 ```{r}
 ### LDA Assumptions.
+
+
 #1: normality testing. Doesent really make sence with such a large data set but
 #will do it in any case. using the shapiro.test and Multivariate Normality will
 #be tested using MVN.
+
 test <- shapiro.test(Spam.train[,1])
+
 results <- rep(0,dim(Spam.train)[2] - 1)
 
 for (i in 1:length(results)){
@@ -380,21 +369,21 @@ for (i in 1:length(results)){
 }
 
 library(MVN)
-result <- mvn(data = Spam.validation[-58])
-result$multivariateNormality
+result <- mvn(data = Spam.train[-58])
 
-# Graphical Assessment of Multivariate Normality
+#Graphical Assessment of Multivariate Normality
 x <- as.matrix(Spam.train[-58])
-center <- colMeans(x)
-n <- nrow(x); 
-p <- ncol(x); 
+center <- colMeans(x) # centroid
+n <- nrow(x);
+p <- ncol(x)
 cov <- cov(x); 
-d <- mahalanobis(x,center,cov) # distances 
-qqplot(qchisq(ppoints(n),df=p),d,
+d <- mahalanobis(x,center,cov)
+qqplot(qchisq(ppoints(n),df=p),
+       d,
        main="QQ Plot Assessing Multivariate Normality",
        ylab="Mahalanobis D2")
 abline(a=0,b=1)
-
+grid()
 
 #2: statistically independence
 (chiSqaured <- chisq.test(x = Spam.train[-58],
@@ -403,9 +392,26 @@ abline(a=0,b=1)
 #3: identical covariance matrices for every class
 (res <- boxM(Spam.train[,-58], Spam.train$spam))
 
+
+
+#can look at the covariance matricies of all the rows...
+correlationMatrix <- matrix(data = 0,
+                           nrow = length(Spam.train) - 1,
+                           ncol = length(Spam.train) - 1)
+
+for (i in 1:length(Spam.train) - 1){
+  for (j in 1:length(Spam.train) - 1){
+    print(Spam.train[i,58] == Spam.train[j,58])
+    if(Spam.train[i,58] == 'spam'){ #we dont want the main diagonal to have 1's on it
+      correlationMatrix[i,j] <- cov(Spam.test[,i], Spam.test[,j])  
+    }
+  }
+}
+
 ```
 
-\section{Question 2.c}
+
+## Question 2.c
 Random forrest train a bunch of tree independently, using a random sample of the data. This randomness helps to make the model more robust than a single decision tree, and less likely to overfit on the training data. Values are then taken as an average from the generated set of trees. First a generic random forrest is created and then the `h2o.grid` function will be used to try various combinations of the different possible model parameters. 
 ```{r, echo=T, results='hide'}
 suppressMessages(h2o.init(max_mem_size = "10g"))
@@ -424,9 +430,7 @@ rf.probs <- h2o.predict(
   object = rf.spam,
   newdata = as.h2o(Spam.validation)
 )
-```
 
-```{r}
 # we need to do a bit of manipulation to get the h2o dataframe out of it's given
 #format to put it into a data frame that the confusionMatrix function from caret
 #can understand alternativly, one can use# the confusion matrix function from
@@ -437,18 +441,13 @@ rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.validation$spam, mode = "everything")
 storeModelValidationPreformance("Random Forest",cm)
 cm
-```
 
-```{r results='hide'}
 #testing results
 rf.probs <- h2o.predict(
   object = rf.spam,
   newdata = as.h2o(Spam.test)
 )
-```
 
-
-```{r}
 rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.test$spam, mode = "everything")
 storeModelTestPreformance("Random Forest",cm)
@@ -458,7 +457,7 @@ cm
 Next, the h2o.grid function is impelemented. This is done to build up a number of
 diffrent models over a range of diffrent hyper parameters
 
-```{r results='hide'}
+```{r}
 #this will generate 125 diffrent models: for each  mtries, each ntrees and
 #each max_dept. 
 #Number of variables randomly sampled as candidates at each split.
@@ -471,51 +470,37 @@ max_depth = seq(10, 50,length = 5) #Maximum tree depth
 hyper_params <- list(mtries = mtries, ntrees = ntrees, max_depth = max_depth)
 
 rf.grid <- h2o.grid(algorithm = "randomForest",
-                    hyper_params = hyper_params,
-                    x = 1:57, y = 58, 
-                    training_frame = as.h2o(Spam.train),
-                    #validation_frame = datTest_h2o,
-                    nfolds = 0,
-                    seed = 1)
-
+                      hyper_params = hyper_params,
+                      x = 1:57, y = 58, 
+                      training_frame = as.h2o(Spam.train),
+                      #validation_frame = datTest_h2o,
+                      nfolds = 0,
+                      seed = 1)
 
 rf.best <- h2o.getModel(rf.grid@model_ids[[1]])
 
 #Validation results
-suppressMessages(
-  rf.probs <- h2o.predict(
-    object = rf.best,
-    newdata = as.h2o(Spam.validation)
-  )
+rf.probs <- h2o.predict(
+  object = rf.best,
+  newdata = as.h2o(Spam.validation)
 )
-```
-
-```{r}
-#calculate the results and store
 rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.validation$spam, mode = "everything")
 storeModelValidationPreformance("Random Forest,Grid",cm)
 cm
-```
 
-```{r results='hide'}
 #Testing results
-suppressMessages(
-  rf.probs <- h2o.predict(
-    object = rf.best,
-    newdata = as.h2o(Spam.test)
-  )
+rf.probs <- h2o.predict(
+  object = rf.best,
+  newdata = as.h2o(Spam.test)
 )
-```
-
-```{r}
 rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.test$spam, mode = "everything")
 storeModelTestPreformance("Random Forest,Grid",cm)
 ```
 
-\subsection{generate a plot to show the OOB error}
-```{r results='hide'}
+#generate a plot to show the OOB error
+```{r warning=TRUE}
 models=list()
 n <- 20 #the number of models to plot
 
@@ -543,9 +528,8 @@ for (i in 1:n) {
   res_devTest[i] <- h2o.mse(h2o.performance(h2o.getModel(rf.grid@model_ids[[i]]),
                                             newdata = as.h2o(Spam.test)))
 }
-```
-Plot of training errors for different models
-```{r}
+
+# Plot of training errors for different models:
 #trying to see if the out of bag error and the test errors give similar results
 plot(res_devTest[1:n],
      xaxt = "n",
@@ -568,15 +552,16 @@ legend("topleft",
        lty = 1,
        col = c("blue", "red"))
 grid(col = "lightgray", lty = "dotted")
+
 ```
 
-Variable importance plot
-```{r results='hide'}
+```{r}
+
 h2o.varimp_plot(rf.best)
 ```
 
-Now that we know what the ideal values are for the random forest we can try and refine the parameters even further by tuning the range of the hyper parameters to prevent saturation.
-```{r results='hide'}
+#Now that we know what the ideal values are for the random forest we can try and refine the parameters even further by tuning the range of the hyper parameters to prevent saturation.
+```{r}
 #this will generate 125 diffrent models: for each  mtries, each ntrees and
 #each max_dept. 
 #Number of variables randomly sampled as candidates at each split.
@@ -600,39 +585,33 @@ rf.best2 <- h2o.getModel(rf.grid2@model_ids[[1]])
 
 #Validation results
 rf.probs <- h2o.predict(
-    object = rf.best2,
-    newdata = as.h2o(Spam.validation)
-  )
-```
-
-```{r}
+  object = rf.best2,
+  newdata = as.h2o(Spam.validation)
+)
 rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.validation$spam, mode = "everything")
 storeModelValidationPreformance("Random Forest,Grid2",cm)
 cm
-```
 
-```{r results='hide'}
 #Testing results
 rf.probs <- h2o.predict(
-    object = rf.best2,
-    newdata = as.h2o(Spam.test)
+  object = rf.best2,
+  newdata = as.h2o(Spam.test)
 )
-```
-
-```{r}
 rf.probs <- as.data.frame(rf.probs)
 cm <- confusionMatrix(rf.probs$predict, Spam.test$spam, mode = "everything")
 storeModelTestPreformance("Random Forest,Grid2",cm)
 ```
 
-\section{question 2.d: boosted trees}
+
+## question 2.d: boosted trees
 Next, a classification tree is grown for boosted trees. Boosted trees build trees one at a time, where each new tree helps to correct errors made by previously trained tree. It is a more itterative process. As with random forests first a standard GBM is grown and then an itterative tree is created using `h2o.grid`.
 ```{r, echo=T, results='hide'}
 gbm.spam <- h2o.gbm(training_frame = as.h2o(Spam.train),
                     x = 1:57,
                     y = 58,
                     seed = 1)
+
 #validation results
 gbm.probs <- h2o.predict(object = gbm.spam, newdata = as.h2o(Spam.validation))
 gbm.probs <- as.data.frame(gbm.probs)
@@ -642,13 +621,14 @@ cm
 
 #testing results
 gbm.probs <- h2o.predict(object = gbm.spam, newdata = as.h2o(Spam.test))
-
 gbm.probs <- as.data.frame(gbm.probs)
 cm <- confusionMatrix(gbm.probs$predict, Spam.test$spam, mode = "everything")
 storeModelTestPreformance("Boosted Tree",cm)
 ```
 
-```{r results='hide'}
+
+
+```{r}
 #we not introduce learning_rate and learn_rate instead of mtries. still generating
 # 125 diffrent values over the full grid
 learn_rate = seq(0.005, 0.5, length = 5)
@@ -672,23 +652,16 @@ gbm.probs <- h2o.predict(
   newdata = as.h2o(Spam.validation)
 )
 gbm.probs <- as.data.frame(gbm.probs)
-```
 
-```{r}
 cm <- confusionMatrix(gbm.probs$predict, Spam.validation$spam, mode = "everything")
 storeModelValidationPreformance("Boosted Tree,Grid",cm)
+cm
 
-```
-
-```{r results='hide'}
 #testing results
 gbm.probs <- h2o.predict(
   object = gbm.best,
   newdata = as.h2o(Spam.test)
 )
-```
-
-```{r}
 gbm.probs <- as.data.frame(gbm.probs)
 
 cm <- confusionMatrix(gbm.probs$predict, Spam.test$spam, mode = "everything")
@@ -696,8 +669,7 @@ storeModelTestPreformance("Boosted Tree,Grid",cm)
 
 h2o.varimp_plot(gbm.best)
 ```
-
-```{r results='hide'}
+```{r}
 models=list()
 n <- 20 #the number of models to plot
 
@@ -725,15 +697,12 @@ for (i in 1:n) {
   res_devTest[i] <- h2o.mse(h2o.performance(h2o.getModel(gbm.grid@model_ids[[i]]),
                                             newdata = as.h2o(Spam.test)))
 }
-```
 
-```{r}
 # Plot of training errors for different models:
 #trying to see if the out of bag error and the test errors give similar results
 plot(res_devTest[1:n],
      xaxt = "n",
      xlab='Grid Parameters (ntrees, mtries, max_depth)',
-     ylab='Residual Deviance',
      ylim=c(min(res_devOOB,res_devTest)*0.95,
             max(res_devOOB,res_devTest)*1.05),
      type = "b",
@@ -744,37 +713,38 @@ axis(1,
 lines(res_devOOB[1:n],
       type = "o",
       col ="blue")
-legend("right",
-       c("GBM Training","Training"),
+legend("bottomright",
+       c("OOB","Test"),
        pch = 21,
        pt.bg = "white",
        lty = 1,
        col = c("blue", "red"))
 grid(col = "lightgray", lty = "dotted")
+
 ```
 
-\section{Question 2.e}
+Question 2.e
 
 This question begings with selecting the best method based off accuracy overall from all testes preformed. We can then modify the ROC position if need be to inflence the Sensitivity spesificity ratio.
 
 ```{r}
 rownames(modelTestPreformance) <- c() # clean up the row data from the model preformance
-kable(modelTestPreformance[order(modelTestPreformance$Accuracy, decreasing = TRUE), ])
+modelTestPreformance[order(modelTestPreformance$Accuracy, decreasing = TRUE), ]
 ```
 
 print the validation error results
 ```{r}
 rownames(modelValidationPreformance) <- c() # clean up the row data from the model preformance
-kable(modelValidationPreformance[order(modelValidationPreformance$Accuracy, decreasing = TRUE), ])
+modelValidationPreformance[order(modelValidationPreformance$Accuracy, decreasing = TRUE), ]
 ```
 
-Some plots.
+
 ```{r}
 # Fit statistics
 blr_model_fit_stats(glm.fit)
 
 # Roc
-glm.fit %>%
+gbm.spam %>%
   blr_gains_table() %>%
   blr_roc_curve(xaxis_title = "False Positive Rate", yaxis = "True Positive Rate")
 
@@ -789,157 +759,30 @@ glm.fit %>%
   plot()
 ```
 
-
-create a glm in h2o so we can plot it's roc.
-```{r results='hide'}
-glm.h2o <- h2o.glm(x = 1:57,
-                   y = 58, 
-                   training_frame = as.h2o(Spam.train),
-                   seed = 1234567,        # Seed for random numbers
-                   family = "binomial",   # Outcome variable
-                   lambda_search = FALSE,  # Optimum regularisation lambda
-                   alpha = 0,           # Elastic net regularisation
-                   nfolds = 1)             # N-fold cross validation
-
-#Validation results
-gbm.probs <- h2o.predict(
-  object = glm.h2o,
-  newdata = as.h2o(Spam.validation)
-)
-gbm.probs <- as.data.frame(gbm.probs)
-```
 ```{r}
-cm <- confusionMatrix(gbm.probs$predict, Spam.validation$spam, mode = "everything")
-storeModelValidationPreformance("Repeated CV, GLM",cm)
-cm
-```
-
-this next graph's implementation was inspired from here: https://stackoverflow.com/questions/44034944/how-to-directly-plot-roc-of-h2o-model-object-in-r
-
-```{r}
-
-
 # for example I have 4 H2OModels
-list(gbm.spam, rf.best2, glm.h2o) %>% 
+list(gbm.spam) %>% 
   # map a function to each element in the list
-  purrr::map(function(x) x %>% h2o.performance() %>% 
+  map(function(x) x %>% h2o.performance(valid=T) %>% 
         # from all these 'paths' in the object
         .@metrics %>% .$thresholds_and_metric_scores %>% 
         # extracting true positive rate and false positive rate
         .[c('tpr','fpr')] %>% 
         # add (0,0) and (1,1) for the start and end point of ROC curve
-        tibble::add_row(tpr=0,fpr=0,.before=T) %>% 
-        tibble::add_row(tpr=0,fpr=0,.before=F)) %>% 
+        add_row(tpr=0,fpr=0,.before=T) %>% 
+        add_row(tpr=0,fpr=0,.before=F)) %>% 
   # add a column of model name for future grouping in ggplot2
-  purrr::map2(c('Best Gradient Boosted Tree','Best Random Forest','Best General Linear Model'),
-        function(x,y) x %>% tibble::add_column(model=y)) %>% 
+  map2(c('Logistic Regression','Decision Tree','Random Forest','Gradient Boosting'),
+        function(x,y) x %>% add_column(model=y)) %>% 
   # reduce four data.frame to one
-  purrr::reduce(rbind) %>% 
+  reduce(rbind) %>% 
   # plot fpr and tpr, map model to color as grouping
   ggplot(aes(fpr,tpr,col=model))+
   geom_line()+
   geom_segment(aes(x=0,y=0,xend = 1, yend = 1),linetype = 2,col='grey')+
   xlab('False Positive Rate')+
   ylab('True Positive Rate')+
-  theme_bw() +
-  theme(legend.position=c(0.8,0.2))
+  ggtitle('ROC Curve for Four Models')
 ```
 
-Lastly we will influence the threshold value to try and get the impact on the Error rate. First we will plot it for the GLM. Then it is done for the Boosted tree
-
-```{r}
-results <- data.frame()
-probs <- predict(glm.fit, newdata = Spam.validation[-58], type = "response")
-
-for (i in 0:100){
-  pred <- rep("email", length(probs))
-  pred[probs > i/100] <- "spam"
-  (cm <- confusionMatrix(factor(pred), Spam.validation$spam, mode = "everything"))
-  (results <- rbind(results,
-                   data.frame(
-                              index = i,
-                              FalsePositiveRate = 1 - cm$byClass["Specificity"],
-                              FlaseNegativeRate = 1 - cm$byClass["Sensitivity"],
-                              OverallError = 1 - cm$overall["Accuracy"],
-                              F1 = cm$byClass["F1"])))
-                              
-}
-
-ggplot(results, aes(x=index, y=error)) + 
-  geom_line(aes(y = FalsePositiveRate,
-                colour = "False Positive Rate (Classifying legit email as spam)")) + 
-  geom_line(aes(y = FlaseNegativeRate,
-                colour = "False Negative Rate (Classifying spam as legit email)")) + 
-  geom_line(aes(y = OverallError, colour = "Overall Error (Total missclasified)")) + 
-  geom_line(aes(y = F1,
-                colour = "F1 Statistic (normally maximized for ideal classifier)")) + 
-  xlab('Threshold') +
-  ylab('Error Rate') +
-  labs(colour = "Error Statistic") +
-  theme_bw() +
-  theme(legend.position=c(0.5,0.5))
-
-```
-
-```{r}
-probs <- predict(glm.fit, newdata = Spam.train[-58], type = "response")
-glm.pred <- rep("email", length(probs))
-glm.pred[probs > 0.85] <- "spam"
-confusionMatrix(factor(glm.pred), Spam.train$spam, mode = "everything")
-```
-Lets do the same process for the best gbm
-
-```{r results='hide'}
-probs <- h2o.predict(object = gbm.best, newdata = as.h2o(Spam.validation))
-```
-
-```{r}
-results <- data.frame()
-
-#we need to convert the h2o frame to a matrix to do the comparison
-probs <- as.matrix(probs$spam)
-
-#itterate through all elements and extract the values we want to plot
-for (i in 0:100){
-  pred <- rep("email", length(probs))
-  pred[probs > i/100] <- "spam"
-  (cm <- confusionMatrix(factor(pred), Spam.validation$spam, mode = "everything"))
-  (results <- rbind(results,
-                   data.frame(
-                              index = i/100,
-                              FalsePositiveRate = 1 - cm$byClass["Specificity"],
-                              FlaseNegativeRate = 1 - cm$byClass["Sensitivity"],
-                              OverallError = 1 - cm$overall["Accuracy"],
-                              F1 = cm$byClass["F1"])))
-}
-#generate the plot 
-ggplot(results, aes(index)) + 
-  geom_line(aes(y = FalsePositiveRate,
-                colour = "False Positive Rate (Classifying legit email as spam)")) + 
-  geom_line(aes(y = FlaseNegativeRate,
-                colour = "False Negative Rate (Classifying spam as legit email)")) + 
-  geom_line(aes(y = OverallError, colour = "Overall Error (Total missclasified)")) + 
-  geom_line(aes(y = F1,
-                colour = "F1 Statistic (normally maximized for ideal classifier)")) + 
-  geom_vline(xintercept=0.80, linetype = "dashed") +
-  xlab('Threshold') +
-  ylab('Error Rate') +
-  labs(colour = "Error Statistic") +
-  theme_bw() +
-  theme(legend.position=c(0.5,0.5))
-```
-
-
-```{r results='hide'}
-gbm.probs <- h2o.predict(object = gbm.best, newdata = as.h2o(Spam.test))
-```
-```{r}
-gbm.probs <- as.data.frame(gbm.probs)
-
-gbm.pred <- rep("email", length(gbm.probs$spam))
-gbm.pred[gbm.probs$spam > 0.8] <- "spam"
-
-cm <- confusionMatrix(as.factor(gbm.pred), Spam.test$spam, mode = "everything")
-cm
-```
 
