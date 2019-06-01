@@ -1,2 +1,2 @@
 # RegressionAndClassificationExploration
-This repository contains all the source code and report an assignment on classification and regression in supervised learning.
+This repository contains all the source code and a report on classification and regression in supervised learning.
